@@ -299,6 +299,16 @@ module Technoweenie # :nodoc:
           thumb.save!
         end
       end
+      
+      # Destroys all the current thumbnails and recreates them from the original.  Useful if you
+      # change the sizes and need to recreate thumbnails for all previously uploaded files.
+      def recreate_thumbnails
+        destroy_thumbnails
+        new_tmp = create_temp_file
+        attachment_options[:thumbnails].each do |suffix, size|
+          create_or_update_thumbnail(new_tmp, suffix, *size)
+        end
+      end
 
       # Sets the content type.
       def content_type=(new_type)
