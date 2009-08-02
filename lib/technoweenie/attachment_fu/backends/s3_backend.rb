@@ -38,7 +38,8 @@ module Technoweenie # :nodoc:
       #     bucket_name: appname
       #     access_key_id: <your key>
       #     secret_access_key: <your key>
-      #     distribution_domain: XXXX.cloudfront.net
+      #     # Using multiple CNAMEs to serve out the same bucket via CloudFront
+      #     distribution_domain: [cdn0.mydomain.com, cdn1.mydomain.com, cdn2.mydomain.com]
       #
       # You can change the location of the config path by passing a full path to the :s3_config_path option.
       #
@@ -66,7 +67,10 @@ module Technoweenie # :nodoc:
       # * <tt>:port</tt> - The port to the requests should be made on. Defaults to 80 or 443 if <tt>:use_ssl</tt> is set.
       # * <tt>:use_ssl</tt> - If set to true, <tt>:port</tt> will be implicitly set to 443, unless specified otherwise. Defaults to false.
       # * <tt>:distribution_domain</tt> - The CloudFront distribution domain for the bucket.  This can either be the assigned
-      #     distribution domain (ie. XXX.cloudfront.net) or a chosen domain using a CNAME. See CloudFront for more details.
+      #     distribution domain (ie. XXX.cloudfront.net) or an array of chosen domains using CNAMEs.  See CloudFront for more details.
+      #     If you specify an array, then a domain will be automatically selected for each attachment_fu object requested.  The algorithm
+      #     guarantees the same domain will be always selected for the same attachment_fu object so it won't interfere with the client's
+      #     ability to cache the requested file.
       #
       # == Usage
       #
@@ -217,8 +221,10 @@ module Technoweenie # :nodoc:
           @port_string ||= (s3_config[:port].nil? || s3_config[:port] == (s3_config[:use_ssl] ? 443 : 80)) ? '' : ":#{s3_config[:port]}"
         end
         
-        def self.distribution_domain
-          @distribution_domain = s3_config[:distribution_domain]
+        def self.distribution_domains
+          # If it's an array, leave it.  Otherwise, it's a single domain so we make it into a single-element array.
+          config_val = s3_config[:distribution_domain]
+          @distribution_domains = config_val.is_a?(Array) ? config_val : [config_val]
         end
 
         module ClassMethods
@@ -234,8 +240,8 @@ module Technoweenie # :nodoc:
             Technoweenie::AttachmentFu::Backends::S3Backend.port_string
           end
           
-          def cloudfront_distribution_domain
-            Technoweenie::AttachmentFu::Backends::S3Backend.distribution_domain
+          def cloudfront_distribution_domains
+            Technoweenie::AttachmentFu::Backends::S3Backend.distribution_domains
           end
         end
 
@@ -284,9 +290,15 @@ module Technoweenie # :nodoc:
         # The resulting url is in the form: <tt>http://:distribution_domain/:table_name/:id/:file</tt> using
         # the <tt>:distribution_domain</tt> variable set in the configuration parameters in <tt>RAILS_ROOT/config/amazon_s3.yml</tt>.
         #
+        # If you specified multiple distribution domains, it will select one from the array.  The algorithm
+        # guarantees that the same domain will always be selected for the same attachment_fu object, but that distribution across
+        # the distribution domains will be roughly equal.  This non-random selection is done to enable caching on the client side.
+        #
         # The optional thumbnail argument will output the thumbnail's filename (if any).
         def cloudfront_url(thumbnail = nil)
-          "http://" + cloudfront_distribution_domain + "/" + full_filename(thumbnail)
+          # Use the object's database ID to determine a domain to select from
+          domain = cloudfront_distribution_domains[self.id % cloudfront_distribution_domains.size]
+          "http://" + domain + "/" + full_filename(thumbnail)
         end
         
         def public_filename(*args)
@@ -348,8 +360,8 @@ module Technoweenie # :nodoc:
           Technoweenie::AttachmentFu::Backends::S3Backend.port_string
         end
         
-        def cloudfront_distribution_domain
-          Technoweenie::AttachmentFu::Backends::S3Backend.distribution_domain
+        def cloudfront_distribution_domains
+          Technoweenie::AttachmentFu::Backends::S3Backend.distribution_domains
         end
 
         protected

@@ -48,7 +48,8 @@ has_attachment(options = {})
     :partition        # Whether to partiton files in directories like /0000/0001/image.jpg. Default is true. Only applicable to the :file_system backend.
     :storage          # Specifies the storage system to use..
                       # Defaults to :db_file.  Options are :file_system, :db_file, :s3, and :cloud_files.
-    :cloudfront       # If using S3 for storage, this option allows for serving the files via Amazon CloudFront.
+    :cloudfront       # If using S3 for storage, this option allows for serving the files via Amazon CloudFront.  You will
+                      # need to specify one or more distribution domains in the amazon_s3.yml file.
                       # Defaults to false.
     :processor        # Sets the image processor to use for resizing of the attached image.
                       # Options include ImageScience, Rmagick, and MiniMagick.  Default is whatever is installed.
